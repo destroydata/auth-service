@@ -1,5 +1,6 @@
 package com.example.auth.service;
 
+import com.example.auth.client.api.OwnerClient;
 import com.example.auth.client.request.OwnerRequest;
 import com.example.auth.config.JwtService;
 import com.example.auth.domain.entity.Role;
@@ -25,7 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RestTemplate restTemplate;
+    private final OwnerClient ownerClient;
     @Transactional
     public void signUp(SignupRequest request){
         User build = User.builder()
@@ -37,20 +38,15 @@ public class AuthService {
                 .build();
         User save = userRepository.save(build);
         if(save.getRole() == Role.OWNER){
-            saveCeoClient(save);
+            OwnerRequest ownerRequest = new OwnerRequest(
+                    save.getId(), save.getName(), save.getNumber());
+            ResponseEntity<Void> response = ownerClient.saveOwner(ownerRequest);
+            if(response.getStatusCode() != HttpStatus.CREATED) {
+                String err = save.getRole().name() + "-SERVICE DEAD";
+                throw new RuntimeException(err);
+            }
         }
 
-    }
-
-    private void saveCeoClient(User save) {
-        ResponseEntity<Void> response = restTemplate.postForEntity("http://localhost:9001/api/v1/owner",
-                new OwnerRequest(save.getId(), save.getName(), save.getNumber()),
-                Void.class
-        );
-        if(response.getStatusCode() != HttpStatus.CREATED) {
-            String err = save.getRole().name() + "-SERVICE DEAD";
-            throw new RuntimeException(err);
-        }
     }
 
     public LoginResponse login(LoginRequest request){
