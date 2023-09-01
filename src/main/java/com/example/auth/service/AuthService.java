@@ -1,5 +1,6 @@
 package com.example.auth.service;
 
+import com.example.auth.client.api.CustomerClient;
 import com.example.auth.client.api.OwnerClient;
 import com.example.auth.client.request.OwnerRequest;
 import com.example.auth.config.JwtService;
@@ -15,9 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
-import javax.swing.text.html.Option;
 import java.util.Optional;
 
 @Service
@@ -27,6 +26,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final OwnerClient ownerClient;
+    private final CustomerClient customerClient;
     @Transactional
     public void signUp(SignupRequest request){
         User build = User.builder()
@@ -37,10 +37,16 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
         User save = userRepository.save(build);
+        OwnerRequest ownerRequest = new OwnerRequest(
+                save.getId(), save.getName(), save.getNumber());
         if(save.getRole() == Role.OWNER){
-            OwnerRequest ownerRequest = new OwnerRequest(
-                    save.getId(), save.getName(), save.getNumber());
             ResponseEntity<Void> response = ownerClient.saveOwner(ownerRequest);
+            if(response.getStatusCode() != HttpStatus.CREATED) {
+                String err = save.getRole().name() + "-SERVICE DEAD";
+                throw new RuntimeException(err);
+            }
+        }else{
+            ResponseEntity<Void> response = customerClient.saveCustomer(ownerRequest);
             if(response.getStatusCode() != HttpStatus.CREATED) {
                 String err = save.getRole().name() + "-SERVICE DEAD";
                 throw new RuntimeException(err);
